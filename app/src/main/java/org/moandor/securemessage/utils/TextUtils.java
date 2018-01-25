@@ -18,6 +18,9 @@ public class TextUtils {
     }
 
     public static UUID uuidFromBase64(String base64) {
-        return UUID.nameUUIDFromBytes(Base64.decode(base64, Base64.NO_PADDING));
+        ByteBuffer buffer = ByteBuffer.wrap(Base64.decode(base64, Base64.NO_PADDING));
+        long msb = buffer.getLong();
+        long lsb = buffer.getLong();
+        return new UUID(msb, lsb);
     }
 }
