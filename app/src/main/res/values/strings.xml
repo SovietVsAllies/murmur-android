@@ -1,0 +1,18 @@
+<resources>
+
+    <string name="app_name">Secure Message</string>
+
+    <string name="network_error">Network error</string>
+    <string name="error_code_message">Error code: %1$d, %2$s</string>
+    <string name="unknown_error">Unknown error %s</string>
+    <string name="json_error">JSON parse error</string>
+
+    <!-- MainFragment -->
+    <string name="local_id">ID: %s</string>
+    <string name="registering">Registering…</string>
+    <string name="target_id">Target ID</string>
+    <string name="content">Content</string>
+    <string name="send_message">Send message</string>
+    <string name="send">Send</string>
+
+</resources>
