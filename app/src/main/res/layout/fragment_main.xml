@@ -16,6 +16,7 @@
         android:layout_marginTop="16dp"
         android:text="@string/registering"
         android:textAppearance="@android:style/TextAppearance.Material.Medium"
+        android:textIsSelectable="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"/>

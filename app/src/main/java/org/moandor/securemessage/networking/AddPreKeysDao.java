@@ -36,7 +36,7 @@ public class AddPreKeysDao implements BaseDao<Void> {
             data.put("key_ids", new JSONArray(mKeyIds));
             JSONArray keys = new JSONArray();
             for (byte[] key : mKeys) {
-                keys.put(Base64.encodeToString(key, Base64.DEFAULT));
+                keys.put(Base64.encodeToString(key, Base64.NO_PADDING | Base64.NO_WRAP));
             }
             data.put("keys", keys);
             HttpUtils.doPost(UrlHelper.API_PRE_KEYS, data.toString());

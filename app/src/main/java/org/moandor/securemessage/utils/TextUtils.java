@@ -14,11 +14,12 @@ public class TextUtils {
         ByteBuffer buffer = ByteBuffer.wrap(new byte[16]);
         buffer.putLong(uuid.getMostSignificantBits());
         buffer.putLong(uuid.getLeastSignificantBits());
-        return Base64.encodeToString(buffer.array(), Base64.NO_PADDING);
+        return Base64.encodeToString(buffer.array(), Base64.NO_PADDING | Base64.NO_WRAP);
     }
 
     public static UUID uuidFromBase64(String base64) {
-        ByteBuffer buffer = ByteBuffer.wrap(Base64.decode(base64, Base64.NO_PADDING));
+        ByteBuffer buffer = ByteBuffer.wrap(Base64.decode(
+                base64, Base64.NO_PADDING | Base64.NO_WRAP));
         long msb = buffer.getLong();
         long lsb = buffer.getLong();
         return new UUID(msb, lsb);

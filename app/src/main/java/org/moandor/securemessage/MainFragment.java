@@ -44,6 +44,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class MainFragment extends Fragment {
+    private TextView mReceivedMessages;
+    private EditText mTarget;
+    private MessageTask mMessageTask;
+    private final LinkedBlockingQueue<String> mPendingMessages = new LinkedBlockingQueue<>();
+
     private static final String TAG = MainFragment.class.getSimpleName();
 
     @Nullable
@@ -56,29 +61,39 @@ public class MainFragment extends Fragment {
     @Override
     public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
         TextView localId = view.findViewById(R.id.local_id);
-        TextView receivedMessages = view.findViewById(R.id.received_messages);
+        mReceivedMessages = view.findViewById(R.id.received_messages);
+        mTarget = view.findViewById(R.id.target_id);
         Optional<UUID> accountId = PreferenceUtils.getLocalAccountId();
         if (accountId.isPresent()) {
             setIdText(localId, accountId.get());
         } else {
             new IdRegistrationTask(localId).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
-        final LinkedBlockingQueue<String> pendingMessages = new LinkedBlockingQueue<>();
         Button sendButton = view.findViewById(R.id.send_button);
         final EditText sendMessage = view.findViewById(R.id.send_text);
         sendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 try {
-                    pendingMessages.put(sendMessage.getText().toString());
+                    mPendingMessages.put(sendMessage.getText().toString());
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
         });
-        EditText target = view.findViewById(R.id.target_id);
-        new MessageTask(receivedMessages, target, pendingMessages).executeOnExecutor(
-                AsyncTask.THREAD_POOL_EXECUTOR);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        mMessageTask = new MessageTask(mReceivedMessages, mTarget, mPendingMessages);
+        mMessageTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        mMessageTask.cancel(true);
     }
 
     private static void setIdText(TextView text, UUID id) {
@@ -104,63 +119,76 @@ public class MainFragment extends Fragment {
 
         @Override
         protected void onPreExecute() {
-            mLocalAccountId = PreferenceUtils.getLocalAccountId().get().toString();
+            mLocalAccountId = TextUtils.uuidToBase64(PreferenceUtils.getLocalAccountId().get());
         }
 
         @Override
         protected Void doInBackground(Void... voids) {
-            try {
-                WebSocket socket = new WebSocketFactory().createSocket(
-                        UrlHelper.WEB_SOCKET_MESSAGE + "?user=" + mLocalAccountId);
-                socket.addListener(new WebSocketAdapter() {
-                    @Override
-                    public void onTextMessage(WebSocket websocket, String text) throws Exception {
-                        publishProgress(text);
-                    }
-                });
-                socket.connect();
-                while (true) {
-                    String message = mPendingMessages.poll(1, TimeUnit.MINUTES);
-                    final EditText target = mTarget.get();
-                    if (message != null && target != null) {
-                        mTargetId = null;
-                        GlobalContext.getInstance().runOnMainThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                mTargetId = target.getText().toString();
-                                synchronized (MessageTask.this) {
-                                    MessageTask.this.notifyAll();
+            while (!isCancelled()) {
+                try {
+                    WebSocket socket = new WebSocketFactory().createSocket(
+                            UrlHelper.WEB_SOCKET_MESSAGE + "?account_id=" + mLocalAccountId);
+                    socket.addListener(new WebSocketAdapter() {
+                        @Override
+                        public void onTextMessage(WebSocket websocket, String text) throws Exception {
+                            Log.d(TAG, "Message received: " + text);
+                            publishProgress(text);
+                        }
+                    });
+                    socket.connect();
+                    while (!isCancelled()) {
+                        String message = mPendingMessages.poll(1, TimeUnit.MINUTES);
+                        final EditText target = mTarget.get();
+                        if (message != null && target != null) {
+                            mTargetId = null;
+                            GlobalContext.getInstance().runOnMainThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    mTargetId = target.getText().toString();
+                                    synchronized (MessageTask.this) {
+                                        MessageTask.this.notifyAll();
+                                    }
+                                }
+                            });
+                            synchronized (this) {
+                                while (mTargetId == null) {
+                                    wait();
                                 }
                             }
-                        });
-                        synchronized (this) {
-                            while (mTargetId == null) {
-                                wait();
-                            }
+                            JSONObject data = new JSONObject();
+                            data.put("type", "send_message");
+                            JSONObject data1 = new JSONObject();
+                            data1.put("receiver", mTargetId);
+                            data1.put("content", message);
+                            data.put("data", data1);
+                            socket.sendText(data.toString());
+                            Log.d(TAG, "Message sent: " + data.toString());
                         }
-                        mTargetId = TextUtils.uuidFromBase64(mTargetId).toString();
-                        JSONObject data = new JSONObject();
-                        data.put("receiver", mTargetId);
-                        data.put("content", message);
-                        socket.sendText(data.toString());
-                        Log.d(TAG, "Message sent: " + data.toString());
                     }
-                    if (isCancelled()) {
-                        break;
-                    }
+                } catch (IOException | InterruptedException | JSONException |
+                        WebSocketException e) {
+                    e.printStackTrace();
                 }
-            } catch (IOException | InterruptedException | JSONException | WebSocketException e) {
-                e.printStackTrace();
             }
             return null;
         }
 
         @Override
         protected void onProgressUpdate(String... values) {
-            String message = values[0];
-            TextView view = mReceivedMessages.get();
-            if (view != null) {
-                view.append(message + '\n');
+            try {
+                JSONObject data = new JSONObject(values[0]);
+                if (data.getString("type").equals("received_message")) {
+                    data = data.getJSONObject("data");
+                    TextView view = mReceivedMessages.get();
+                    if (view != null) {
+                        view.append(String.format(
+                                "%s: %s\n",
+                                data.getString("sender"),
+                                data.getString("content")));
+                    }
+                }
+            } catch (JSONException e) {
+                e.printStackTrace();
             }
         }
     }

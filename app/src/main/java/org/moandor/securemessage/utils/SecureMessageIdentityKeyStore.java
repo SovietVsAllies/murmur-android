@@ -20,9 +20,11 @@ public class SecureMessageIdentityKeyStore implements IdentityKeyStore {
     public IdentityKeyPair getIdentityKeyPair() {
         try {
             IdentityKey publicKey = new IdentityKey(Base64.decode(
-                    PreferenceUtils.getIdentityPublic(), Base64.DEFAULT), 0);
+                    PreferenceUtils.getIdentityPublic(),
+                    Base64.NO_PADDING | Base64.NO_WRAP), 0);
             ECPrivateKey privateKey = Curve.decodePrivatePoint(Base64.decode(
-                    PreferenceUtils.getIdentityPrivate(), Base64.DEFAULT));
+                    PreferenceUtils.getIdentityPrivate(),
+                    Base64.NO_PADDING | Base64.NO_WRAP));
             return new IdentityKeyPair(publicKey, privateKey);
         } catch (InvalidKeyException e) {
             e.printStackTrace();
@@ -56,9 +58,11 @@ public class SecureMessageIdentityKeyStore implements IdentityKeyStore {
 
     public void saveIdentityKeyPair(IdentityKeyPair identityKeyPair) {
         PreferenceUtils.setIdentityPublic(
-                Base64.encodeToString(identityKeyPair.getPublicKey().serialize(), Base64.DEFAULT));
+                Base64.encodeToString(identityKeyPair.getPublicKey().serialize(),
+                        Base64.NO_PADDING | Base64.NO_WRAP));
         PreferenceUtils.setIdentityPrivate(
-                Base64.encodeToString(identityKeyPair.getPrivateKey().serialize(), Base64.DEFAULT));
+                Base64.encodeToString(identityKeyPair.getPrivateKey().serialize(),
+                        Base64.NO_PADDING | Base64.NO_WRAP));
     }
 
     public void saveLocalRegistrationId(int id) {

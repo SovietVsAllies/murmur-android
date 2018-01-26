@@ -39,7 +39,7 @@ public class IdentityDatabaseHelper extends SQLiteOpenHelper {
         ContentValues values = new ContentValues();
         values.put(ADDRESS, record.getAddress().getName());
         values.put(IDENTITY_KEY, Base64.encodeToString(
-                record.getIdentityKey().serialize(), Base64.DEFAULT));
+                record.getIdentityKey().serialize(), Base64.NO_PADDING | Base64.NO_WRAP));
         database.replace(TABLE_NAME, null, values);
     }
 
@@ -53,7 +53,7 @@ public class IdentityDatabaseHelper extends SQLiteOpenHelper {
                         new IdentityKey(
                                 Base64.decode(
                                         cursor.getString(cursor.getColumnIndex(IDENTITY_KEY)),
-                                        Base64.DEFAULT),
+                                        Base64.NO_PADDING | Base64.NO_WRAP),
                                 0)));
             }
         } catch (InvalidKeyException e) {

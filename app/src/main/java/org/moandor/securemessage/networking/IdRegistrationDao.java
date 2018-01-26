@@ -26,8 +26,10 @@ public class IdRegistrationDao implements BaseDao<Account> {
     public Account execute() throws NotifyException {
         try {
             JSONObject data = new JSONObject();
-            data.put("identity_key", Base64.encodeToString(mIdentityKey, Base64.DEFAULT));
-            data.put("signed_pre_key", Base64.encodeToString(mSignedPreKey, Base64.DEFAULT));
+            data.put("identity_key", Base64.encodeToString(
+                    mIdentityKey, Base64.NO_PADDING | Base64.NO_WRAP));
+            data.put("signed_pre_key", Base64.encodeToString(
+                    mSignedPreKey, Base64.NO_PADDING | Base64.NO_WRAP));
             String response = HttpUtils.doPost(UrlHelper.API_ACCOUNTS, data.toString());
             return parseJson(response);
         } catch (JSONException e) {
@@ -40,7 +42,9 @@ public class IdRegistrationDao implements BaseDao<Account> {
         JSONObject json = new JSONObject(jsonStr);
         return new Account(
                 UUID.fromString(json.getString("id")),
-                Base64.decode(json.getString("identity_key"), Base64.DEFAULT),
-                Base64.decode(json.getString("signed_pre_key"), Base64.DEFAULT));
+                Base64.decode(json.getString("identity_key"),
+                        Base64.NO_PADDING | Base64.NO_WRAP),
+                Base64.decode(json.getString("signed_pre_key"),
+                        Base64.NO_PADDING | Base64.NO_WRAP));
     }
 }
