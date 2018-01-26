@@ -19,11 +19,8 @@ public class HttpUtils {
     private static final int CONNECT_TIMEOUT = 10 * 1000;
     private static final int READ_TIMEOUT = 10 * 1000;
 
-    public static String doGet(String urlAddress, HttpParams params) throws NotifyException {
+    public static String doGet(String urlAddress) throws NotifyException {
         try {
-            if (params != null) {
-                urlAddress += '?' + params.encodeUrl();
-            }
             URL url = new URL(urlAddress);
             Proxy proxy = getProxy();
             HttpURLConnection connection;

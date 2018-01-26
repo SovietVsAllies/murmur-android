@@ -22,8 +22,7 @@ public class FetchPreKeyDao implements BaseDao<PreKeyRecord> {
 
     @Override
     public PreKeyRecord execute() throws NotifyException {
-        String response = HttpUtils.doGet(
-                UrlHelper.API_PRE_KEYS + mAccountId + '/', null);
+        String response = HttpUtils.doGet(UrlHelper.API_PRE_KEYS + mAccountId + '/');
         try {
             JSONObject json = new JSONObject(response);
             return new PreKeyRecord(Base64.decode(json.getString("key"), Base64.DEFAULT));

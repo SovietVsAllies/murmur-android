@@ -11,8 +11,6 @@ import org.moandor.securemessage.utils.HttpUtils;
 import org.moandor.securemessage.utils.NotifyException;
 import org.moandor.securemessage.utils.UrlHelper;
 
-import java.util.UUID;
-
 public class IdRegistrationDao implements BaseDao<Account> {
     private final byte[] mIdentityKey;
     private final byte[] mSignedPreKey;
@@ -29,18 +27,10 @@ public class IdRegistrationDao implements BaseDao<Account> {
             data.put("identity_key", Base64.encodeToString(mIdentityKey, Base64.DEFAULT));
             data.put("signed_pre_key", Base64.encodeToString(mSignedPreKey, Base64.DEFAULT));
             String response = HttpUtils.doPost(UrlHelper.API_ACCOUNTS, data.toString());
-            return parseJson(response);
+            return Account.parseJson(response);
         } catch (JSONException e) {
             e.printStackTrace();
             throw new NotifyException(GlobalContext.getInstance().getString(R.string.json_error));
         }
-    }
-
-    private Account parseJson(String jsonStr) throws JSONException {
-        JSONObject json = new JSONObject(jsonStr);
-        return new Account(
-                UUID.fromString(json.getString("id")),
-                Base64.decode(json.getString("identity_key"), Base64.DEFAULT),
-                Base64.decode(json.getString("signed_pre_key"), Base64.DEFAULT));
     }
 }
