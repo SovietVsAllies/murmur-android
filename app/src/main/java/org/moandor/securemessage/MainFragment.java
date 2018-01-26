@@ -125,8 +125,9 @@ public class MainFragment extends Fragment {
         @Override
         protected Void doInBackground(Void... voids) {
             while (!isCancelled()) {
+                WebSocket socket = null;
                 try {
-                    WebSocket socket = new WebSocketFactory().createSocket(
+                    socket = new WebSocketFactory().createSocket(
                             UrlHelper.WEB_SOCKET_MESSAGE + "?account_id=" + mLocalAccountId);
                     socket.addListener(new WebSocketAdapter() {
                         @Override
@@ -168,6 +169,10 @@ public class MainFragment extends Fragment {
                 } catch (IOException | InterruptedException | JSONException |
                         WebSocketException e) {
                     e.printStackTrace();
+                } finally {
+                    if (socket != null) {
+                        socket.disconnect();
+                    }
                 }
             }
             return null;
