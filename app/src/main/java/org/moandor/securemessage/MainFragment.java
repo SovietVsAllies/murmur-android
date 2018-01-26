@@ -22,14 +22,15 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.moandor.securemessage.models.Account;
 import org.moandor.securemessage.networking.AddPreKeysDao;
+import org.moandor.securemessage.networking.FetchPreKeyDao;
 import org.moandor.securemessage.networking.IdRegistrationDao;
 import org.moandor.securemessage.utils.NotifyException;
 import org.moandor.securemessage.utils.PreferenceUtils;
 import org.moandor.securemessage.utils.SecureMessageProtocolStore;
-import org.moandor.securemessage.utils.TextUtils;
 import org.moandor.securemessage.utils.UrlHelper;
 import org.whispersystems.libsignal.IdentityKeyPair;
 import org.whispersystems.libsignal.InvalidKeyException;
+import org.whispersystems.libsignal.SignalProtocolAddress;
 import org.whispersystems.libsignal.state.PreKeyRecord;
 import org.whispersystems.libsignal.state.SignedPreKeyRecord;
 import org.whispersystems.libsignal.util.KeyHelper;
@@ -97,8 +98,7 @@ public class MainFragment extends Fragment {
     }
 
     private static void setIdText(TextView text, UUID id) {
-        text.setText(GlobalContext.getInstance().getString(
-                R.string.local_id, TextUtils.uuidToBase64(id)));
+        text.setText(GlobalContext.getInstance().getString(R.string.local_id, id));
     }
 
     private static class MessageTask extends AsyncTask<Void, String, Void> {
@@ -119,19 +119,21 @@ public class MainFragment extends Fragment {
 
         @Override
         protected void onPreExecute() {
-            mLocalAccountId = TextUtils.uuidToBase64(PreferenceUtils.getLocalAccountId().get());
+            mLocalAccountId = PreferenceUtils.getLocalAccountId().get().toString();
         }
 
         @Override
         protected Void doInBackground(Void... voids) {
             while (!isCancelled()) {
+                SecureMessageProtocolStore store = new SecureMessageProtocolStore();
                 WebSocket socket = null;
                 try {
                     socket = new WebSocketFactory().createSocket(
                             UrlHelper.WEB_SOCKET_MESSAGE + "?account_id=" + mLocalAccountId);
                     socket.addListener(new WebSocketAdapter() {
                         @Override
-                        public void onTextMessage(WebSocket websocket, String text) throws Exception {
+                        public void onTextMessage(WebSocket websocket, String text)
+                                throws Exception {
                             Log.d(TAG, "Message received: " + text);
                             publishProgress(text);
                         }
@@ -156,10 +158,23 @@ public class MainFragment extends Fragment {
                                     wait();
                                 }
                             }
+                            UUID targetId;
+                            try {
+                                targetId = UUID.fromString(mTargetId);
+                            } catch (IllegalArgumentException e) {
+                                throw new NotifyException(R.string.invalid_target_id);
+                            }
+                            SignalProtocolAddress address = new SignalProtocolAddress(
+                                    targetId.toString(), 0);
+                            if (!store.containsSession(address)) {
+                                FetchPreKeyDao fetchPreKeyDao = new FetchPreKeyDao(targetId);
+                                PreKeyRecord preKeyRecord = fetchPreKeyDao.execute();
+                                // TODO
+                            }
                             JSONObject data = new JSONObject();
                             data.put("type", "send_message");
                             JSONObject data1 = new JSONObject();
-                            data1.put("receiver", mTargetId);
+                            data1.put("receiver", targetId);
                             data1.put("content", message);
                             data.put("data", data1);
                             socket.sendText(data.toString());
@@ -169,6 +184,14 @@ public class MainFragment extends Fragment {
                 } catch (IOException | InterruptedException | JSONException |
                         WebSocketException e) {
                     e.printStackTrace();
+                } catch (final NotifyException e) {
+                    final GlobalContext context = GlobalContext.getInstance();
+                    context.runOnMainThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    });
                 } finally {
                     if (socket != null) {
                         socket.disconnect();

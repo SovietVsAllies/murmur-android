@@ -21,7 +21,10 @@ public class HttpUtils {
 
     public static String doGet(String urlAddress, HttpParams params) throws NotifyException {
         try {
-            URL url = new URL(urlAddress + "?" + params.encodeUrl());
+            if (params != null) {
+                urlAddress += '?' + params.encodeUrl();
+            }
+            URL url = new URL(urlAddress);
             Proxy proxy = getProxy();
             HttpURLConnection connection;
             if (proxy != null) {

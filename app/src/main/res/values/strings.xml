@@ -14,5 +14,6 @@
     <string name="content">Content</string>
     <string name="send_message">Send message</string>
     <string name="send">Send</string>
+    <string name="invalid_target_id">Invalid target ID</string>
 
 </resources>
