@@ -1,6 +1,7 @@
 package org.moandor.securemessage.utils;
 
 import android.support.annotation.NonNull;
+import android.text.TextUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;

@@ -1,5 +1,7 @@
 package org.moandor.securemessage.utils;
 
+import android.text.TextUtils;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.moandor.securemessage.GlobalContext;
