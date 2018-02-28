@@ -1,6 +1,7 @@
 package org.moandor.securemessage;
 
 import android.app.Fragment;
+import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
@@ -22,10 +23,12 @@ import com.neovisionaries.ws.client.WebSocketFactory;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.moandor.securemessage.models.Account;
+import org.moandor.securemessage.models.PendingMessage;
 import org.moandor.securemessage.networking.AddPreKeysDao;
 import org.moandor.securemessage.networking.FetchAccountDao;
 import org.moandor.securemessage.networking.FetchPreKeyDao;
 import org.moandor.securemessage.networking.IdRegistrationDao;
+import org.moandor.securemessage.services.MessageService;
 import org.moandor.securemessage.utils.NotifyException;
 import org.moandor.securemessage.utils.PreferenceUtils;
 import org.moandor.securemessage.utils.SecureMessageProtocolStore;
@@ -66,7 +69,7 @@ import java.util.concurrent.TimeUnit;
 public class MainFragment extends Fragment {
     private TextView mReceivedMessages;
     private EditText mTarget;
-    private MessageTask mMessageTask;
+//    private MessageTask mMessageTask;
     private final LinkedBlockingQueue<String> mPendingMessages = new LinkedBlockingQueue<>();
 
     private static final String TAG = MainFragment.class.getSimpleName();
@@ -94,8 +97,8 @@ public class MainFragment extends Fragment {
                     if (account == null) {
                         return;
                     }
-                    mMessageTask = new MessageTask(mReceivedMessages, mTarget, mPendingMessages);
-                    mMessageTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+//                    mMessageTask = new MessageTask(mReceivedMessages, mTarget, mPendingMessages);
+//                    mMessageTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
                 }
             });
             task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
@@ -105,11 +108,18 @@ public class MainFragment extends Fragment {
         sendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                try {
-                    mPendingMessages.put(sendMessage.getText().toString());
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+//                try {
+//                    mPendingMessages.put(sendMessage.getText().toString());
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
+                PendingMessage message = new PendingMessage(
+                        UUID.fromString(mTarget.getText().toString()),
+                        sendMessage.getText().toString());
+                Intent intent = new Intent(GlobalContext.getInstance(), MessageService.class);
+                intent.setAction(MessageService.ACTION_SEND_MESSAGE);
+                intent.putExtra(MessageService.EXTRA_MESSAGE, message);
+                GlobalContext.getInstance().startService(intent);
             }
         });
     }
@@ -118,17 +128,17 @@ public class MainFragment extends Fragment {
     public void onResume() {
         super.onResume();
         if (PreferenceUtils.getLocalAccountId().isPresent()) {
-            mMessageTask = new MessageTask(mReceivedMessages, mTarget, mPendingMessages);
-            mMessageTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+//            mMessageTask = new MessageTask(mReceivedMessages, mTarget, mPendingMessages);
+//            mMessageTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        if (mMessageTask != null) {
-            mMessageTask.cancel(true);
-        }
+//        if (mMessageTask != null) {
+//            mMessageTask.cancel(true);
+//        }
     }
 
     private static void setIdText(TextView text, UUID id) {
