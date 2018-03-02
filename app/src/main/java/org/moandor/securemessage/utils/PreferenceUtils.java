@@ -10,11 +10,6 @@ import org.whispersystems.libsignal.util.guava.Optional;
 import java.util.UUID;
 
 public class PreferenceUtils {
-    private static final String PREF_IDENTITY_PRIVATE = "pref-identity-private";
-    private static final String PREF_IDENTITY_PUBLIC = "pref-identity-public";
-    private static final String PREF_LOCAL_REG_ID = "pref-local-reg-id";
-    private static final String PREF_LOCAL_ACCOUNT = "pref-local-account-id";
-
     public static String getIdentityPrivate() {
         return getPreferences().getString(PREF_IDENTITY_PRIVATE, null);
     }
@@ -50,6 +45,24 @@ public class PreferenceUtils {
     public static void setLocalAccountId(@NonNull UUID account) {
         setPreference(PREF_LOCAL_ACCOUNT, account.toString());
     }
+
+    public static Optional<UUID> getTargetId() {
+        String id = getPreferences().getString(PREF_TARGET_ID, null);
+        if (id == null) {
+            return Optional.absent();
+        }
+        return Optional.of(UUID.fromString(id));
+    }
+
+    public static void setTargetId(@NonNull UUID id) {
+        setPreference(PREF_TARGET_ID, id.toString());
+    }
+
+    private static final String PREF_IDENTITY_PRIVATE = "pref-identity-private";
+    private static final String PREF_IDENTITY_PUBLIC = "pref-identity-public";
+    private static final String PREF_LOCAL_REG_ID = "pref-local-reg-id";
+    private static final String PREF_LOCAL_ACCOUNT = "pref-local-account-id";
+    private static final String PREF_TARGET_ID = "pref-target-id";
 
     private static void setPreference(String key, String value) {
         SharedPreferences.Editor editor = getPreferences().edit();
