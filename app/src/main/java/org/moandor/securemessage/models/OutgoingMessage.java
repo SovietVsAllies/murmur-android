@@ -5,17 +5,17 @@ import android.os.Parcelable;
 
 import java.util.UUID;
 
-public class PendingMessage implements Parcelable {
-    private UUID mTargetId;
+public class OutgoingMessage implements Parcelable {
+    private UUID mRecipient;
     private String mMessage;
 
-    public PendingMessage(UUID targetId, String message) {
-        mTargetId = targetId;
+    public OutgoingMessage(UUID recipient, String message) {
+        mRecipient = recipient;
         mMessage = message;
     }
 
     public UUID getTargetId() {
-        return mTargetId;
+        return mRecipient;
     }
 
     public String getMessage() {
@@ -27,26 +27,26 @@ public class PendingMessage implements Parcelable {
         return 0;
     }
 
-    public static final Creator<PendingMessage> CREATOR = new Creator<PendingMessage>() {
+    public static final Creator<OutgoingMessage> CREATOR = new Creator<OutgoingMessage>() {
         @Override
-        public PendingMessage createFromParcel(Parcel in) {
+        public OutgoingMessage createFromParcel(Parcel in) {
             long msb = in.readLong();
             long lsb = in.readLong();
             UUID targetId = new UUID(msb, lsb);
             String message = in.readString();
-            return new PendingMessage(targetId, message);
+            return new OutgoingMessage(targetId, message);
         }
 
         @Override
-        public PendingMessage[] newArray(int size) {
-            return new PendingMessage[size];
+        public OutgoingMessage[] newArray(int size) {
+            return new OutgoingMessage[size];
         }
     };
 
     @Override
     public void writeToParcel(Parcel dest, int flags) {
-        dest.writeLong(mTargetId.getMostSignificantBits());
-        dest.writeLong(mTargetId.getLeastSignificantBits());
+        dest.writeLong(mRecipient.getMostSignificantBits());
+        dest.writeLong(mRecipient.getLeastSignificantBits());
         dest.writeString(mMessage);
     }
 }

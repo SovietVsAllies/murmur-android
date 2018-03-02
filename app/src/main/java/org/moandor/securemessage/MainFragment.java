@@ -1,7 +1,10 @@
 package org.moandor.securemessage;
 
 import android.app.Fragment;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
@@ -23,7 +26,8 @@ import com.neovisionaries.ws.client.WebSocketFactory;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.moandor.securemessage.models.Account;
-import org.moandor.securemessage.models.PendingMessage;
+import org.moandor.securemessage.models.IncomingMessage;
+import org.moandor.securemessage.models.OutgoingMessage;
 import org.moandor.securemessage.networking.AddPreKeysDao;
 import org.moandor.securemessage.networking.FetchAccountDao;
 import org.moandor.securemessage.networking.FetchPreKeyDao;
@@ -33,6 +37,7 @@ import org.moandor.securemessage.utils.NotifyException;
 import org.moandor.securemessage.utils.PreferenceUtils;
 import org.moandor.securemessage.utils.SecureMessageProtocolStore;
 import org.moandor.securemessage.utils.UrlHelper;
+import org.moandor.securemessage.utils.Utilities;
 import org.whispersystems.libsignal.DuplicateMessageException;
 import org.whispersystems.libsignal.IdentityKey;
 import org.whispersystems.libsignal.IdentityKeyPair;
@@ -67,12 +72,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class MainFragment extends Fragment {
-    private TextView mReceivedMessages;
-    private EditText mTarget;
-//    private MessageTask mMessageTask;
-    private final LinkedBlockingQueue<String> mPendingMessages = new LinkedBlockingQueue<>();
+    public static final String ACTION_MESSAGE_RECEIVED =
+            Utilities.addPackagePrefix("ACTION_MESSAGE_RECEIVED");
 
-    private static final String TAG = MainFragment.class.getSimpleName();
+    public static final String EXTRA_MESSAGE_RECEIVED =
+            Utilities.addPackagePrefix("EXTRA_MESSAGE_RECEIVED");
 
     @Nullable
     @Override
@@ -113,7 +117,7 @@ public class MainFragment extends Fragment {
 //                } catch (InterruptedException e) {
 //                    e.printStackTrace();
 //                }
-                PendingMessage message = new PendingMessage(
+                OutgoingMessage message = new OutgoingMessage(
                         UUID.fromString(mTarget.getText().toString()),
                         sendMessage.getText().toString());
                 Intent intent = new Intent(GlobalContext.getInstance(), MessageService.class);
@@ -131,15 +135,37 @@ public class MainFragment extends Fragment {
 //            mMessageTask = new MessageTask(mReceivedMessages, mTarget, mPendingMessages);
 //            mMessageTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
+        GlobalContext.getInstance().registerReceiver(
+                mMessageReceiver, new IntentFilter(ACTION_MESSAGE_RECEIVED));
     }
 
     @Override
     public void onPause() {
+        GlobalContext.getInstance().unregisterReceiver(mMessageReceiver);
         super.onPause();
 //        if (mMessageTask != null) {
 //            mMessageTask.cancel(true);
 //        }
     }
+
+    private TextView mReceivedMessages;
+    private EditText mTarget;
+    //    private MessageTask mMessageTask;
+    private final LinkedBlockingQueue<String> mPendingMessages = new LinkedBlockingQueue<>();
+
+    private BroadcastReceiver mMessageReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Bundle extras = intent.getExtras();
+            assert extras != null;
+            IncomingMessage message = extras.getParcelable(EXTRA_MESSAGE_RECEIVED);
+            assert message != null;
+            mReceivedMessages.append(String.format("%s: %s\n",
+                    message.getSender().toString(), message.getMessage()));
+        }
+    };
+
+    private static final String TAG = MainFragment.class.getSimpleName();
 
     private static void setIdText(TextView text, UUID id) {
         text.setText(GlobalContext.getInstance().getString(R.string.local_id, id));

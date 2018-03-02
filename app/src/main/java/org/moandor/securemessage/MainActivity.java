@@ -28,7 +28,7 @@ public class MainActivity extends Activity {
             public void run() {
                 try {
                     new PeerNetwork();
-                } catch (IOException e) {
+                } catch (IOException | IllegalArgumentException e) {
                     e.printStackTrace();
                 }
             }

@@ -17,8 +17,10 @@ import com.neovisionaries.ws.client.WebSocketFactory;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.moandor.securemessage.GlobalContext;
+import org.moandor.securemessage.MainFragment;
 import org.moandor.securemessage.models.Account;
-import org.moandor.securemessage.models.PendingMessage;
+import org.moandor.securemessage.models.IncomingMessage;
+import org.moandor.securemessage.models.OutgoingMessage;
 import org.moandor.securemessage.networking.FetchAccountDao;
 import org.moandor.securemessage.networking.FetchPreKeyDao;
 import org.moandor.securemessage.utils.NotifyException;
@@ -46,7 +48,9 @@ import org.whispersystems.libsignal.state.PreKeyRecord;
 import org.whispersystems.libsignal.state.SignedPreKeyRecord;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -58,7 +62,7 @@ public class MessageService extends Service {
 
     private boolean mRunning = false;
     private String mLocalAccountId;
-    private LinkedBlockingQueue<PendingMessage> mPendingMessages = new LinkedBlockingQueue<>();
+    private LinkedBlockingQueue<OutgoingMessage> mPendingMessages = new LinkedBlockingQueue<>();
     private Thread mWorkerThread;
 
     private static final String TAG = MessageService.class.getSimpleName();
@@ -99,7 +103,7 @@ public class MessageService extends Service {
             if (extras == null) {
                 return;
             }
-            PendingMessage message = extras.getParcelable(EXTRA_MESSAGE);
+            OutgoingMessage message = extras.getParcelable(EXTRA_MESSAGE);
             mPendingMessages.add(message);
         }
     }
@@ -140,7 +144,19 @@ public class MessageService extends Service {
                                         default:
                                             Log.d(TAG, "Unknown message type: " +
                                                     messageType);
-                                            break;
+                                            return;
+                                    }
+                                    try {
+                                        IncomingMessage message = new IncomingMessage(
+                                                UUID.fromString(sender),
+                                                new String(decryptedMessage, "UTF-8"));
+                                        Intent intent =
+                                                new Intent(MainFragment.ACTION_MESSAGE_RECEIVED);
+                                        intent.putExtra(
+                                                MainFragment.EXTRA_MESSAGE_RECEIVED, message);
+                                        GlobalContext.getInstance().sendBroadcast(intent);
+                                    } catch (UnsupportedEncodingException e) {
+                                        throw new AssertionError(e);
                                     }
                                 }
                             } catch (JSONException |
@@ -158,7 +174,8 @@ public class MessageService extends Service {
                     });
                     socket.connect();
                     while (mRunning) {
-                        PendingMessage message = mPendingMessages.poll(1, TimeUnit.MINUTES);
+                        OutgoingMessage message = mPendingMessages.poll(
+                                1, TimeUnit.MINUTES);
                         if (message == null) {
                             continue;
                         }
