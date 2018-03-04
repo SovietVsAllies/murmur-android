@@ -13,12 +13,15 @@ import com.neovisionaries.ws.client.WebSocket;
 import com.neovisionaries.ws.client.WebSocketAdapter;
 import com.neovisionaries.ws.client.WebSocketException;
 import com.neovisionaries.ws.client.WebSocketFactory;
+import com.neovisionaries.ws.client.WebSocketListener;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.moandor.securemessage.DatabaseHelper;
 import org.moandor.securemessage.GlobalContext;
 import org.moandor.securemessage.MainFragment;
 import org.moandor.securemessage.models.Account;
+import org.moandor.securemessage.models.ConversationMessage;
 import org.moandor.securemessage.models.IncomingMessage;
 import org.moandor.securemessage.models.OutgoingMessage;
 import org.moandor.securemessage.networking.FetchAccountDao;
@@ -49,6 +52,7 @@ import org.whispersystems.libsignal.state.SignedPreKeyRecord;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.Date;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -112,66 +116,11 @@ public class MessageService extends Service {
         @Override
         public void run() {
             while (mRunning) {
-                final SecureMessageProtocolStore store = new SecureMessageProtocolStore();
                 WebSocket socket = null;
                 try {
                     socket = new WebSocketFactory().createSocket(
                             UrlHelper.WEB_SOCKET_MESSAGE + "?account_id=" + mLocalAccountId);
-                    socket.addListener(new WebSocketAdapter() {
-                        @Override
-                        public void onTextMessage(WebSocket websocket, String text) {
-                            Log.d(TAG, "Message received: " + text);
-                            try {
-                                JSONObject json = new JSONObject(text);
-                                if (json.getString("type").equals("received_message")) {
-                                    JSONObject data = json.getJSONObject("data");
-                                    String sender = data.getString("sender");
-                                    String messageType = data.getString("message_type");
-                                    byte[] content = Base64.decode(
-                                            data.getString("content"), Base64.DEFAULT);
-                                    SessionCipher cipher = new SessionCipher(
-                                            store, new SignalProtocolAddress(sender, 0));
-                                    byte[] decryptedMessage;
-                                    switch (messageType) {
-                                        case "signal_message":
-                                            decryptedMessage = cipher.decrypt(
-                                                    new SignalMessage(content));
-                                            break;
-                                        case "pre_key_signal_message":
-                                            decryptedMessage = cipher.decrypt(
-                                                    new PreKeySignalMessage(content));
-                                            break;
-                                        default:
-                                            Log.d(TAG, "Unknown message type: " +
-                                                    messageType);
-                                            return;
-                                    }
-                                    try {
-                                        IncomingMessage message = new IncomingMessage(
-                                                UUID.fromString(sender),
-                                                new String(decryptedMessage, "UTF-8"));
-                                        Intent intent =
-                                                new Intent(MainFragment.ACTION_MESSAGE_RECEIVED);
-                                        intent.putExtra(
-                                                MainFragment.EXTRA_MESSAGE_RECEIVED, message);
-                                        GlobalContext.getInstance().sendBroadcast(intent);
-                                    } catch (UnsupportedEncodingException e) {
-                                        throw new AssertionError(e);
-                                    }
-                                }
-                            } catch (JSONException |
-                                    LegacyMessageException |
-                                    InvalidMessageException |
-                                    InvalidKeyException |
-                                    InvalidKeyIdException |
-                                    DuplicateMessageException |
-                                    InvalidVersionException |
-                                    UntrustedIdentityException |
-                                    NoSessionException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    });
+                    socket.addListener(mWebSocketListener);
                     socket.connect();
                     while (mRunning) {
                         OutgoingMessage message = mPendingMessages.poll(
@@ -181,7 +130,7 @@ public class MessageService extends Service {
                         }
                         SignalProtocolAddress address = new SignalProtocolAddress(
                                 message.getTargetId().toString(), 0);
-                        if (!store.containsSession(address)) {
+                        if (!mStore.containsSession(address)) {
                             FetchPreKeyDao fetchPreKeyDao =
                                     new FetchPreKeyDao(message.getTargetId());
                             PreKeyRecord preKeyRecord = fetchPreKeyDao.execute();
@@ -200,13 +149,16 @@ public class MessageService extends Service {
                                     signedPreKeyRecord.getKeyPair().getPublicKey(),
                                     signedPreKeyRecord.getSignature(),
                                     identityKey);
-                            new SessionBuilder(store, address).process(preKeyBundle);
+                            new SessionBuilder(mStore, address).process(preKeyBundle);
                         }
-                        SessionCipher cipher = new SessionCipher(store, address);
+                        SessionCipher cipher = new SessionCipher(mStore, address);
                         JSONObject data = new JSONObject();
                         data.put("type", "send_message");
+                        JSONObject messageJson = new JSONObject();
+                        messageJson.put("content", message.getMessage());
+                        messageJson.put("date_sent", message.getDateSent().getTime());
                         CiphertextMessage encryptedMessage = cipher.encrypt(
-                                message.getMessage().getBytes("UTF-8"));
+                                messageJson.toString().getBytes("UTF-8"));
                         JSONObject data1 = new JSONObject();
                         data1.put("receiver", message.getTargetId());
                         data1.put("content", Base64.encodeToString(
@@ -241,5 +193,69 @@ public class MessageService extends Service {
                 }
             }
         }
+
+        private SecureMessageProtocolStore mStore = new SecureMessageProtocolStore();
+
+        private WebSocketListener mWebSocketListener = new WebSocketAdapter() {
+            @Override
+            public void onTextMessage(WebSocket websocket, String text) {
+                Log.d(TAG, "Message received: " + text);
+                try {
+                    JSONObject json = new JSONObject(text);
+                    if (json.getString("type").equals("received_message")) {
+                        JSONObject data = json.getJSONObject("data");
+                        UUID sender = UUID.fromString(data.getString("sender"));
+                        String messageType = data.getString("message_type");
+                        byte[] content = Base64.decode(
+                                data.getString("content"), Base64.DEFAULT);
+                        SessionCipher cipher = new SessionCipher(
+                                mStore, new SignalProtocolAddress(sender.toString(), 0));
+                        byte[] decryptedMessage;
+                        switch (messageType) {
+                            case "signal_message":
+                                decryptedMessage = cipher.decrypt(new SignalMessage(content));
+                                break;
+                            case "pre_key_signal_message":
+                                decryptedMessage = cipher.decrypt(new PreKeySignalMessage(content));
+                                break;
+                            default:
+                                Log.d(TAG, "Unknown message type: " + messageType);
+                                return;
+                        }
+                        try {
+                            JSONObject messageJson = new JSONObject(new String(
+                                    decryptedMessage, "UTF-8"));
+                            String messageContent = messageJson.getString("content");
+                            Date dateSent = new Date(messageJson.getLong("date_sent"));
+                            DatabaseHelper.getInstance().saveMessage(new ConversationMessage(
+                                    sender,
+                                    dateSent,
+                                    new Date(),
+                                    messageContent,
+                                    ConversationMessage.Direction.IN));
+                            IncomingMessage message = new IncomingMessage(
+                                    sender,
+                                    messageContent,
+                                    dateSent);
+                            Intent intent = new Intent(MainFragment.ACTION_MESSAGE_RECEIVED);
+                            intent.putExtra(MainFragment.EXTRA_MESSAGE_RECEIVED, message);
+                            GlobalContext.getInstance().sendBroadcast(intent);
+                        } catch (UnsupportedEncodingException e) {
+                            throw new AssertionError(e);
+                        }
+                    }
+                } catch (JSONException |
+                        LegacyMessageException |
+                        InvalidMessageException |
+                        InvalidKeyException |
+                        InvalidKeyIdException |
+                        DuplicateMessageException |
+                        InvalidVersionException |
+                        UntrustedIdentityException |
+                        NoSessionException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
     }
 }

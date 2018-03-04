@@ -1,7 +1,10 @@
 package org.moandor.securemessage;
 
 import android.app.Application;
+import android.content.Intent;
 import android.os.Handler;
+
+import org.moandor.securemessage.services.MessageService;
 
 public class GlobalContext extends Application {
     private Handler mHandler;

@@ -2,7 +2,7 @@ package org.moandor.securemessage.utils;
 
 import android.util.Base64;
 
-import org.moandor.securemessage.IdentityDatabaseHelper;
+import org.moandor.securemessage.DatabaseHelper;
 import org.moandor.securemessage.IdentityRecord;
 import org.whispersystems.libsignal.IdentityKey;
 import org.whispersystems.libsignal.IdentityKeyPair;
@@ -38,7 +38,7 @@ public class SecureMessageIdentityKeyStore implements IdentityKeyStore {
     @Override
     public boolean saveIdentity(SignalProtocolAddress address, IdentityKey identityKey) {
         synchronized (LOCK) {
-            IdentityDatabaseHelper helper = new IdentityDatabaseHelper();
+            DatabaseHelper helper = DatabaseHelper.getInstance();
             Optional<IdentityRecord> record = helper.getIdentity(address);
             if (!record.isPresent()) {
                 helper.saveIdentity(new IdentityRecord(address, identityKey));

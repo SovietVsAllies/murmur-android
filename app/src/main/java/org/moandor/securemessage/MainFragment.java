@@ -1,5 +1,6 @@
 package org.moandor.securemessage;
 
+import android.annotation.SuppressLint;
 import android.app.Fragment;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -17,6 +18,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.moandor.securemessage.models.Account;
+import org.moandor.securemessage.models.ConversationMessage;
 import org.moandor.securemessage.models.IncomingMessage;
 import org.moandor.securemessage.models.OutgoingMessage;
 import org.moandor.securemessage.networking.AddPreKeysDao;
@@ -37,6 +39,7 @@ import org.whispersystems.libsignal.util.guava.Optional;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -60,56 +63,75 @@ public class MainFragment extends Fragment {
         TextView localId = view.findViewById(R.id.local_id);
         mReceivedMessages = view.findViewById(R.id.received_messages);
         mTarget = view.findViewById(R.id.target_id);
-        Optional<UUID> target = PreferenceUtils.getTargetId();
-        if (target.isPresent()) {
-            mTarget.setText(target.get().toString());
+        {
+            Optional<UUID> target = PreferenceUtils.getTargetId();
+            if (target.isPresent()) {
+                mTarget.setText(target.get().toString());
+            }
         }
         Optional<UUID> accountId = PreferenceUtils.getLocalAccountId();
         if (accountId.isPresent()) {
             setIdText(localId, accountId.get());
         } else {
             IdRegistrationTask task = new IdRegistrationTask(localId);
-            task.setOnFinishListener(new IdRegistrationTask.OnFinishListener() {
-                @Override
-                public void onFinish(Account account) {
-                    if (account == null) {
-                        return;
-                    }
+            task.setOnFinishListener(account -> {
+                if (account == null) {
+                    return;
+                }
 //                    mMessageTask = new MessageTask(mReceivedMessages, mTarget, mPendingMessages);
 //                    mMessageTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-                }
             });
             task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
         Button sendButton = view.findViewById(R.id.send_button);
         final EditText sendMessage = view.findViewById(R.id.send_text);
-        sendButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                UUID target = UUID.fromString(mTarget.getText().toString());
-                OutgoingMessage message = new OutgoingMessage(
-                        target,
-                        sendMessage.getText().toString());
-                Intent intent = new Intent(GlobalContext.getInstance(), MessageService.class);
-                intent.setAction(MessageService.ACTION_SEND_MESSAGE);
-                intent.putExtra(MessageService.EXTRA_MESSAGE, message);
-                GlobalContext.getInstance().startService(intent);
-                PreferenceUtils.setTargetId(target);
-            }
+        sendButton.setOnClickListener(v -> {
+            UUID target = UUID.fromString(mTarget.getText().toString());
+            OutgoingMessage message = new OutgoingMessage(
+                    target,
+                    sendMessage.getText().toString(),
+                    new Date());
+            Intent intent = new Intent(GlobalContext.getInstance(), MessageService.class);
+            intent.setAction(MessageService.ACTION_SEND_MESSAGE);
+            intent.putExtra(MessageService.EXTRA_MESSAGE, message);
+            GlobalContext.getInstance().startService(intent);
+            PreferenceUtils.setTargetId(target);
         });
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
         GlobalContext.getInstance().registerReceiver(
                 mMessageReceiver, new IntentFilter(ACTION_MESSAGE_RECEIVED));
+        new AsyncTask<Void, Void, List<ConversationMessage>>() {
+            @Override
+            protected void onPreExecute() {
+                mConversationId = UUID.fromString(mTarget.getText().toString());
+            }
+
+            @Override
+            protected List<ConversationMessage> doInBackground(Void... voids) {
+                return DatabaseHelper.getInstance().getMessages(
+                        mConversationId, new Date(), 100);
+            }
+
+            @Override
+            protected void onPostExecute(List<ConversationMessage> result) {
+                StringBuilder builder = new StringBuilder();
+                for (int i = result.size() - 1; i >= 0; --i) {
+                    ConversationMessage message = result.get(i);
+                    UUID sender = message.getDirection() == ConversationMessage.Direction.IN ?
+                            PreferenceUtils.getLocalAccountId().get() : message.getConversationId();
+                    builder.append(String.format("%s: %s\n",
+                            sender.toString(), message.getContent()));
+                }
+                mReceivedMessages.setText(builder.toString() + mReceivedMessages.getText());
+            }
+
+            private UUID mConversationId;
+        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 
     @Override
-    public void onPause() {
+    public void onDestroy() {
         GlobalContext.getInstance().unregisterReceiver(mMessageReceiver);
-        super.onPause();
+        super.onDestroy();
     }
 
     private TextView mReceivedMessages;

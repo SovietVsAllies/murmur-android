@@ -3,15 +3,14 @@ package org.moandor.securemessage.models;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import java.util.Date;
 import java.util.UUID;
 
 public class OutgoingMessage implements Parcelable {
-    private UUID mRecipient;
-    private String mMessage;
-
-    public OutgoingMessage(UUID recipient, String message) {
+    public OutgoingMessage(UUID recipient, String message, Date dateSent) {
         mRecipient = recipient;
         mMessage = message;
+        mDateSent = dateSent;
     }
 
     public UUID getTargetId() {
@@ -20,6 +19,10 @@ public class OutgoingMessage implements Parcelable {
 
     public String getMessage() {
         return mMessage;
+    }
+
+    public Date getDateSent() {
+        return mDateSent;
     }
 
     @Override
@@ -34,7 +37,8 @@ public class OutgoingMessage implements Parcelable {
             long lsb = in.readLong();
             UUID targetId = new UUID(msb, lsb);
             String message = in.readString();
-            return new OutgoingMessage(targetId, message);
+            Date dateSent = new Date(in.readLong());
+            return new OutgoingMessage(targetId, message, dateSent);
         }
 
         @Override
@@ -48,5 +52,10 @@ public class OutgoingMessage implements Parcelable {
         dest.writeLong(mRecipient.getMostSignificantBits());
         dest.writeLong(mRecipient.getLeastSignificantBits());
         dest.writeString(mMessage);
+        dest.writeLong(mDateSent.getTime());
     }
+
+    private UUID mRecipient;
+    private String mMessage;
+    private Date mDateSent;
 }
