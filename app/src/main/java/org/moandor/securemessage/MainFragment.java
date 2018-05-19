@@ -78,8 +78,6 @@ public class MainFragment extends Fragment {
                 if (account == null) {
                     return;
                 }
-//                    mMessageTask = new MessageTask(mReceivedMessages, mTarget, mPendingMessages);
-//                    mMessageTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
             });
             task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
@@ -99,33 +97,34 @@ public class MainFragment extends Fragment {
         });
         GlobalContext.getInstance().registerReceiver(
                 mMessageReceiver, new IntentFilter(ACTION_MESSAGE_RECEIVED));
-        new AsyncTask<Void, Void, List<ConversationMessage>>() {
-            @Override
-            protected void onPreExecute() {
-                mConversationId = UUID.fromString(mTarget.getText().toString());
-            }
-
-            @Override
-            protected List<ConversationMessage> doInBackground(Void... voids) {
-                return DatabaseHelper.getInstance().getMessages(
-                        mConversationId, new Date(), 100);
-            }
-
-            @Override
-            protected void onPostExecute(List<ConversationMessage> result) {
-                StringBuilder builder = new StringBuilder();
-                for (int i = result.size() - 1; i >= 0; --i) {
-                    ConversationMessage message = result.get(i);
-                    UUID sender = message.getDirection() == ConversationMessage.Direction.IN ?
-                            PreferenceUtils.getLocalAccountId().get() : message.getConversationId();
-                    builder.append(String.format("%s: %s\n",
-                            sender.toString(), message.getContent()));
+        Intent intent = new Intent(GlobalContext.getInstance(), MessageService.class);
+        GlobalContext.getInstance().startService(intent);
+        try {
+            new AsyncTask<UUID, Void, List<ConversationMessage>>() {
+                @Override
+                protected List<ConversationMessage> doInBackground(UUID... args) {
+                    return DatabaseHelper.getInstance().getMessages(
+                            args[0], new Date(), 100);
                 }
-                mReceivedMessages.setText(builder.toString() + mReceivedMessages.getText());
-            }
 
-            private UUID mConversationId;
-        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+                @Override
+                protected void onPostExecute(List<ConversationMessage> result) {
+                    StringBuilder builder = new StringBuilder();
+                    for (int i = result.size() - 1; i >= 0; --i) {
+                        ConversationMessage message = result.get(i);
+                        UUID sender = message.getDirection() == ConversationMessage.Direction.IN ?
+                                PreferenceUtils.getLocalAccountId().get() :
+                                message.getConversationId();
+                        builder.append(String.format("%s: %s\n",
+                                sender.toString(), message.getContent()));
+                    }
+                    mReceivedMessages.setText(builder.toString() + mReceivedMessages.getText());
+                }
+            }.executeOnExecutor(
+                    AsyncTask.THREAD_POOL_EXECUTOR, UUID.fromString(mTarget.getText().toString()));
+        } catch (IllegalArgumentException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -136,8 +135,6 @@ public class MainFragment extends Fragment {
 
     private TextView mReceivedMessages;
     private EditText mTarget;
-    //    private MessageTask mMessageTask;
-    private final LinkedBlockingQueue<String> mPendingMessages = new LinkedBlockingQueue<>();
 
     private BroadcastReceiver mMessageReceiver = new BroadcastReceiver() {
         @Override
